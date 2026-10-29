@@ -1,9 +1,17 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const API_BASE = window.API_URL || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? '' : 'https://alharabackend.vercel.app');
+const asset = u => (!u || u.startsWith('http') || u.startsWith('data:')) ? u : (API_BASE + u);
 let D = null, tab = 'orders', editId = null;
 
 async function api(method, url, body) {
-  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const target = url.startsWith('http') ? url : (API_BASE + url);
+  const r = await fetch(target, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+    credentials: 'include'
+  });
   const j = await r.json().catch(() => ({}));
   if (r.status === 401 && url !== '/api/login') { showLogin(); throw new Error('Please sign in again'); }
   if (!r.ok) throw new Error(j.error || 'Something went wrong');
@@ -34,7 +42,7 @@ function toDataUrl(f) {
   });
 }
 const upload = async f => (await api('POST', '/api/admin/upload', { data: await toDataUrl(f) })).url;
-const imgField = (name, label, val) => `<label>${label}<img class="thumb" src="${esc(val)}" alt=""><input type="hidden" name="${name}" value="${esc(val)}"><input type="file" accept="image/*" data-for="${name}"></label>`;
+const imgField = (name, label, val) => `<label>${label}<img class="thumb" src="${esc(asset(val))}" alt=""><input type="hidden" name="${name}" value="${esc(val)}"><input type="file" accept="image/*" data-for="${name}"></label>`;
 $('#view').addEventListener('change', run(async e => {
   const f = e.target; if (!f.dataset.for || !f.files[0]) return;
   msg('Uploading…'); const url = await upload(f.files[0]);

@@ -1,7 +1,9 @@
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const CUP = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 26h34v10a14 14 0 0 1-14 14h-6A14 14 0 0 1 12 36V26zM46 29h4a6 6 0 0 1 0 12h-5M22 8c-3 4 3 6 0 10M32 8c-3 4 3 6 0 10M42 8c-3 4 3 6 0 10"/></svg>';
-const bg = u => u ? `style="background-image:url('${esc(u)}')"` : '';
+const API_BASE = window.API_URL || (location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? '' : 'https://alharabackend.vercel.app');
+const asset = u => (!u || u.startsWith('http') || u.startsWith('data:')) ? u : (API_BASE + u);
+const bg = u => u ? `style="background-image:url('${esc(asset(u))}')"` : '';
 let MENU = [], C = {}, WA = '', TEL = '', CART = {}, CUR = 'All';
 try { CART = JSON.parse(localStorage.getItem('alhara_cart') || '{}'); } catch {}
 const persist = () => { try { localStorage.setItem('alhara_cart', JSON.stringify(CART)); } catch {} };
@@ -11,7 +13,7 @@ function money(n) {
   return pre + (Math.round(n * 100) / 100) + (suf && !pre ? ' ' + suf : '');
 }
 
-fetch('/api/public').then(r => r.json()).then(({ content: c, menu, gallery }) => {
+fetch(API_BASE + '/api/public').then(r => r.json()).then(({ content: c, menu, gallery }) => {
   C = c; MENU = menu;
   for (const k in CART) if (!menu.some(i => i.id === k)) delete CART[k];
   WA = (c.whatsapp.match(/\d/g) || []).join(''); TEL = c.phone.replace(/[^\d+]/g, '');
@@ -21,15 +23,15 @@ fetch('/api/public').then(r => r.json()).then(({ content: c, menu, gallery }) =>
     const t = `<span>${esc(c.announcement)}</span>`.repeat(12); $('#stripTrack').innerHTML = t + t; $('#strip').hidden = false;
   }
   const bt = '<span>Made fresh</span><i>•</i><span>Served with love</span><i>•</i>'.repeat(8); $('#bandTrack').innerHTML = bt + bt;
-  if (c.logo) document.querySelectorAll('.brand').forEach(b => b.innerHTML = `<img src="${esc(c.logo)}" alt="Al Hara Cafeteria">`);
+  if (c.logo) document.querySelectorAll('.brand').forEach(b => b.innerHTML = `<img src="${esc(asset(c.logo))}" alt="Al Hara Cafeteria">`);
   $('#heroTitle').textContent = c.heroTitle; $('#heroText').textContent = c.heroText;
   [['#heroBtn1', c.heroBtn1Text, c.heroBtn1Link], ['#heroBtn2', c.heroBtn2Text, c.heroBtn2Link]].forEach(([s, t, l]) => { const a = $(s); a.textContent = t; a.href = l || '#'; a.hidden = !t; });
-  if (c.heroImage) $('#heroBlob').style.backgroundImage = `url('${c.heroImage}')`; else $('#heroBlob').innerHTML = CUP;
+  if (c.heroImage) $('#heroBlob').style.backgroundImage = `url('${esc(asset(c.heroImage))}')`; else $('#heroBlob').innerHTML = CUP;
   // Order Now: opens the cart (or an external ordering link if the owner set one)
   if (c.orderLink) { const o = $('#orderBtn'); o.href = c.orderLink; o.removeAttribute('data-cart'); o.target = '_blank'; o.rel = 'noopener'; }
   $('#stepSend').textContent = 'Enter your name and phone number, then press Place Order. The cafeteria receives it right away.';
   $('#aboutTitle').textContent = c.aboutTitle; $('#aboutText').textContent = c.aboutText;
-  if (c.aboutImage) $('#aboutImg').style.backgroundImage = `url('${c.aboutImage}')`; else $('#aboutImg').innerHTML = CUP;
+  if (c.aboutImage) $('#aboutImg').style.backgroundImage = `url('${esc(asset(c.aboutImage))}')`; else $('#aboutImg').innerHTML = CUP;
   // categories
   const cats = [...new Set(menu.map(i => i.category))];
   $('#catGrid').innerHTML = cats.map(k => `<button class="cat" data-cat="${esc(k)}"><span class="cimg" ${bg((menu.find(i => i.category === k && i.image) || {}).image)}></span><div><strong>${esc(k)}</strong><small>${menu.filter(i => i.category === k).length} items</small></div></button>`).join('');
@@ -43,7 +45,7 @@ fetch('/api/public').then(r => r.json()).then(({ content: c, menu, gallery }) =>
       <div><h3>${esc(i.name)}</h3><p>${esc(i.desc)}</p>${i.price ? `<span class="price">${esc(i.price)}</span>` : ''}<button class="add" data-add="${i.id}">Add +</button></div></article>`).join('');
   } else document.querySelectorAll('.wave').forEach(w => w.hidden = true);
   $('#gallery').hidden = !gallery.length;
-  $('#masonry').innerHTML = gallery.map(g => `<figure><img loading="lazy" src="${esc(g.image)}" alt="${esc(g.caption || 'Al Hara Cafeteria')}">${g.caption ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('');
+  $('#masonry').innerHTML = gallery.map(g => `<figure><img loading="lazy" src="${esc(asset(g.image))}" alt="${esc(g.caption || 'Al Hara Cafeteria')}">${g.caption ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('');
   // FAQ
   const faq = [['How do I place an order?', 'Add your favorites to the cart, tap Order Now, enter your name and phone number, and press Place Order.'],
     ['Where can I find you?', c.address || 'Our address will be added soon.'], ['When are you open?', c.hours || 'Opening hours will be added soon.'],
@@ -115,7 +117,7 @@ async function placeOrder() {
   const btn = $('#sendOrder'); btn.disabled = true; btn.textContent = 'Placing order…';
   try {
     const txt = orderText() + '\nPhone: ' + phone;
-    const r = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    const r = await fetch(API_BASE + '/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, phone, note: $('#custNote').value, items: list.map(i => ({ id: i.id, qty: CART[i.id] })) }) });
     const j = await r.json(); if (!r.ok) throw new Error(j.error || 'Could not place your order');
     CART = {}; persist(); renderCart();
